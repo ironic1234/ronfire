@@ -44,16 +44,17 @@ fn parse_request(request: &str) -> Option<String> {
     let mut lines = request.lines();
     if let Some(first_line) = lines.next() {
         let mut parts = first_line.split_whitespace();
-        let method = parts.next()?;
-        let path = parts.next().unwrap_or("/").trim_start_matches('/');
-        let version = parts.next()?;
+        let method = parts.next().unwrap_or("");
+        let path = parts.next().unwrap_or("/");
+        let version = parts.next().unwrap_or("");
 
-        if version != "HTTP/1.1" || version != "HTTP/1.0" {
+        if version != "HTTP/1.1" && version != "HTTP/1.0" {
             eprintln!("Unsupported HTTP version: {}", version);
             return None;
         }
 
         if method == "GET" {
+            let path = path.trim_start_matches('/');
             let full_path = if path.is_empty() {
                 "static/index.html".to_string()
             } else {

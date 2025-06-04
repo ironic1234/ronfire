@@ -1,0 +1,4 @@
+localhost {
+    reverse_proxy unix//tmp/hello.sock
+    tls internal
+}
