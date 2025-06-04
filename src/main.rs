@@ -43,13 +43,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 fn parse_request(request: &str) -> Option<String> {
     let mut lines = request.lines();
     if let Some(first_line) = lines.next() {
-        if first_line.starts_with("GET") {
-            let path = first_line
-                .split_whitespace()
-                .nth(1)
-                .unwrap_or("/")
-                .trim_start_matches('/');
+        let mut parts = first_line.split_whitespace();
+        let method = parts.next()?;
+        let path = parts.next().unwrap_or("/").trim_start_matches('/');
+        let version = parts.next()?;
 
+        if version != "HTTP/1.1" || version != "HTTP/1.0" {
+            eprintln!("Unsupported HTTP version: {}", version);
+            return None;
+        }
+
+        if method == "GET" {
             let full_path = if path.is_empty() {
                 "static/index.html".to_string()
             } else {
@@ -57,6 +61,9 @@ fn parse_request(request: &str) -> Option<String> {
             };
 
             return Some(full_path);
+        } else {
+            eprintln!("Unsupported HTTP method: {}", method);
+            return None;
         }
     }
 
