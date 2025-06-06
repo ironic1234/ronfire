@@ -5,13 +5,9 @@ use tokio::net::UnixListener;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Remove existing socket file if it exists
-    let socket_path = &env::args().collect::<Vec<String>>()[1];
-    if std::path::Path::new(socket_path).exists() {
-        std::fs::remove_file(socket_path)?;
-    }
+    let socket_path = env::args().nth(1).expect("Missing socket path");
 
-    let listener = UnixListener::bind(socket_path)?;
+    let listener = create_socket(socket_path).expect("Could not create socket");
 
     loop {
         let (mut socket, _) = listener.accept().await?;
@@ -38,6 +34,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         });
     }
+}
+
+fn create_socket(socket_path: String) -> std::io::Result<UnixListener> {
+    if std::path::Path::new(&socket_path).exists() {
+        let _ = std::fs::remove_file(&socket_path);
+    }
+
+    let listener = UnixListener::bind(socket_path)?;
+    Ok(listener)
 }
 
 fn parse_request(request: &str) -> Option<String> {
