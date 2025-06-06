@@ -1,11 +1,13 @@
 use ronaks_webserver::{
-    create_socket, generate_response, parse_request, read_socket, send_response
+    create_socket, generate_response, parse_request, read_socket, send_response,
 };
 use std::env;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let socket_path = env::args().nth(1).expect("Missing socket path");
+    let socket_path = env::args()
+        .nth(1)
+        .unwrap_or_else(|| "/tmp/ronak.sock".to_string());
 
     let listener = create_socket(socket_path).expect("Could not create socket");
 

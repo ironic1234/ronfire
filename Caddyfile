@@ -1,4 +1,4 @@
 localhost {
-    reverse_proxy unix//tmp/hello.sock
+    reverse_proxy unix//tmp/ronak.sock
     tls internal
 }
