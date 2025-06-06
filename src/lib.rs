@@ -1,5 +1,7 @@
-use tokio::net::UnixListener;
+use mime_guess::from_path;
 use std::fs;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::net::{UnixStream, UnixListener};
 
 /// Creates a Unix domain socket at the given path.
 ///
@@ -78,20 +80,73 @@ pub fn parse_request(request: &str) -> Option<String> {
 /// # Returns
 ///
 /// A complete HTTP response as a `String`, including status line, headers, and body.
-pub fn generate_response(full_path: &str) -> String {
-    match fs::read_to_string(&full_path) {
-        Ok(contents) => format!(
-            "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nContent-Type: text/html\r\n\r\n{}",
-            contents.len(),
-            contents
-        ),
+pub fn generate_response(full_path: &str) -> (String, String, Vec<u8>) {
+    match fs::read(full_path) {
+        Ok(contents) => {
+            let mime_type = from_path(full_path)
+                .first_or_octet_stream()
+                .essence_str()
+                .to_string();
+
+            let status_line = "HTTP/1.1 200 OK\r\n".to_string();
+            let headers = format!(
+                "Content-Length: {}\r\nContent-Type: {}\r\n\r\n",
+                contents.len(),
+                mime_type
+            );
+
+            (status_line, headers, contents)
+        }
         Err(_) => {
-            let body = "<h1>404 Not Found</h1>";
-            format!(
-                "HTTP/1.1 404 Not Found\r\nContent-Length: {}\r\nContent-Type: text/html\r\n\r\n{}",
-                body.len(),
-                body
-            )
+            let body = b"<h1>404 Not Found</h1>".to_vec();
+            let status_line = "HTTP/1.1 404 Not Found\r\n".to_string();
+            let headers = format!(
+                "Content-Length: {}\r\nContent-Type: text/html\r\n\r\n",
+                body.len()
+            );
+
+            (status_line, headers, body)
         }
     }
+}
+
+/// Sends an HTTP-like response over the provided UnixStream socket asynchronously.
+///
+/// The response is sent in three parts: status line, headers, and body.
+/// Each part is written sequentially to the socket. Errors are logged to stderr,
+/// and the function returns early if writing the status or headers fails.
+///
+/// # Arguments
+///
+/// * `socket` - The UnixStream to send the response through.
+/// * `response_parts` - A tuple containing the status line (String),
+///   headers (String), and body (Vec<u8>).
+pub async fn send_response(mut socket: UnixStream, response_parts: (String, String, Vec<u8>)) {
+    let (status, headers, body) = response_parts;
+
+    if let Err(e) = socket.write_all(status.as_bytes()).await {
+        eprintln!("Failed to write status line: {}", e);
+        return;
+    }
+
+    if let Err(e) = socket.write_all(headers.as_bytes()).await {
+        eprintln!("Failed to write headers: {}", e);
+        return;
+    }
+
+    if let Err(e) = socket.write_all(&body).await {
+        eprintln!("Failed to write body: {}", e);
+    }
+}
+
+/// Reads data from the provided UnixStream socket asynchronously.
+/// 
+/// Returns a tuple containing the request as a String and the socket itself.
+/// 
+/// # Errors
+/// Returns an error if reading from the socket fails.
+pub async fn read_socket(mut socket: UnixStream) -> Result<(String, UnixStream), std::io::Error> {
+    let mut buf = [0; 1024];
+    let n = socket.read(&mut buf).await?;
+    Ok((String::from_utf8_lossy(&buf[..n]).to_string(), socket))
 }

@@ -1,6 +1,5 @@
+use ronaks_webserver::{create_socket, generate_response, parse_request, send_response, read_socket};
 use std::env;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use ronaks_webserver::{create_socket, parse_request, generate_response};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -9,20 +8,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let listener = create_socket(socket_path).expect("Could not create socket");
 
     loop {
-        let (mut socket, _) = listener.accept().await?;
+        let (socket, _) = listener.accept().await?;
 
         tokio::spawn(async move {
-            let mut buf = [0; 1024];
-
-            match socket.read(&mut buf).await {
-                Ok(n) if n == 0 => return, // closed
-                Ok(n) => {
-                    let request = String::from_utf8_lossy(&buf[..n]);
+            match read_socket(socket).await {
+                Ok((request, socket)) => {
                     if let Some(full_path) = parse_request(&request) {
                         let response = generate_response(&full_path);
-                        if let Err(e) = socket.write_all(response.as_bytes()).await {
-                            eprintln!("Failed to write to socket: {:?}", e);
-                        }
+                        send_response(socket, response).await;
                     } else {
                         eprintln!("Invalid request: {}", request);
                     }
@@ -34,5 +27,3 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         });
     }
 }
-
-
