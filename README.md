@@ -9,6 +9,8 @@
 - Serves static files (HTML) from a `static/` directory
 - Basic `GET` request parsing
 - Returns `404 Not Found` for missing files
+- `Mime-Type` guessing
+- Sanitizes path traversal attempts
 
 ## Requirements
 
@@ -82,8 +84,6 @@ Content-Type: text/html
 ## Caveats
 
 * Only handles basic `GET` requests.
-* No path sanitization—**do not use in production without hardening.**
-* Only serves files with `text/html` content-type.
 
 ## License
 

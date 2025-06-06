@@ -52,6 +52,13 @@ pub fn parse_request(request: &str) -> Option<String> {
 
         if method == "GET" {
             let path = path.trim_start_matches('/');
+
+            // Reject paths that try to traverse outside the static directory
+            if path.split('/').any(|part| part == "..") {
+                eprintln!("Path traversal attempt: {}", path);
+                return None;
+            }
+
             let full_path = if path.is_empty() {
                 "static/index.html".to_string()
             } else {
