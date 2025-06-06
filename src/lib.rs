@@ -1,7 +1,7 @@
 use mime_guess::from_path;
 use std::fs;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::net::{UnixStream, UnixListener};
+use tokio::net::{UnixListener, UnixStream};
 
 /// Creates a Unix domain socket at the given path.
 ///
@@ -121,7 +121,10 @@ pub fn generate_response(full_path: &str) -> (String, String, Vec<u8>) {
 /// * `socket` - The UnixStream to send the response through.
 /// * `response_parts` - A tuple containing the status line (String),
 ///   headers (String), and body (Vec<u8>).
-pub async fn send_response(mut socket: UnixStream, response_parts: (String, String, Vec<u8>)) {
+pub async fn send_response(
+    mut socket: UnixStream,
+    response_parts: (String, String, Vec<u8>),
+) {
     let (status, headers, body) = response_parts;
 
     if let Err(e) = socket.write_all(status.as_bytes()).await {
@@ -140,12 +143,14 @@ pub async fn send_response(mut socket: UnixStream, response_parts: (String, Stri
 }
 
 /// Reads data from the provided UnixStream socket asynchronously.
-/// 
+///
 /// Returns a tuple containing the request as a String and the socket itself.
-/// 
+///
 /// # Errors
 /// Returns an error if reading from the socket fails.
-pub async fn read_socket(mut socket: UnixStream) -> Result<(String, UnixStream), std::io::Error> {
+pub async fn read_socket(
+    mut socket: UnixStream,
+) -> Result<(String, UnixStream), std::io::Error> {
     let mut buf = [0; 1024];
     let n = socket.read(&mut buf).await?;
     Ok((String::from_utf8_lossy(&buf[..n]).to_string(), socket))

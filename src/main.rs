@@ -1,4 +1,6 @@
-use ronaks_webserver::{create_socket, generate_response, parse_request, send_response, read_socket};
+use ronaks_webserver::{
+    create_socket, generate_response, parse_request, read_socket, send_response
+};
 use std::env;
 
 #[tokio::main]
