@@ -1,6 +1,6 @@
-# ronaks_webserver
+# ronfire
 
-`ronaks_webserver` is a minimal asynchronous static file server built using Rust and Tokio, communicating over a Unix domain socket. It serves files from a local `static/` directory using a simplified HTTP protocol.
+`ronfire` is a minimal asynchronous static file server built using Rust and Tokio, communicating over a Unix domain socket. It serves files from a local `static/` directory using a simplified HTTP protocol.
 
 ## Features
 
@@ -30,12 +30,12 @@ echo "<h1>Hello, world!</h1>" > static/index.html
 ### 2. Build and run the server
 
 ```bash
-cargo run -- /tmp/ronak.sock
+cargo run -- /tmp/ronfire.sock
 ```
 
 This will:
 
-* Remove any existing socket file at `/tmp/ronak.sock`
+* Remove any existing socket file at `/tmp/ronfire.sock`
 * Start listening for HTTP-like requests over the socket
 
 ### 3. Test the server
@@ -43,7 +43,7 @@ This will:
 Use `curl` or similar tools:
 
 ```bash
-curl --unix-socket /tmp/ronak.sock http://localhost/
+curl --unix-socket /tmp/ronfire.sock http://localhost/
 ```
 
 Expected output:

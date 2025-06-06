@@ -1,5 +1,5 @@
 [package]
-name = "ronaks_webserver"
+name = "ronfire"
 version = "0.1.0"
 edition = "2024"
 
