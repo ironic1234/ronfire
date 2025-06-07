@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::fs;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{UnixListener, UnixStream};
@@ -59,16 +59,56 @@ pub fn parse_request(request: &str) -> Option<String> {
                 return None;
             }
 
-            let full_path = if path.is_empty() {
-                "static/index.html".to_string()
-            } else {
-                format!("static/{}", path)
-            };
-
-            return Some(full_path);
+            return resolve_static_path(path);
         } else {
             eprintln!("Unsupported HTTP method: {}", method);
             return None;
+        }
+    }
+
+    None
+}
+
+/// Resolves a user-facing URL path to a static file path on disk using fallback rules.
+///
+/// This function applies simple fallback logic for friendly URLs:
+///
+/// - An empty path (e.g., `/`) maps to `static/index.html`.
+/// - A path ending with `/` (e.g., `/blog/`) maps to `static/blog/index.html`.
+/// - A path without an extension (e.g., `/about`) tries:
+///     - `static/about.html`
+///     - `static/about/index.html`
+/// - A path with an extension (e.g., `/style.css`) is used as-is.
+///
+/// The first path that exists and is a regular file is returned.
+///
+/// # Arguments
+///
+/// * `path` - A normalized URL path without a leading slash (e.g., `about`, `blog/`, `css/main.css`).
+///
+/// # Returns
+///
+/// * `Some(String)` if a valid file is found under the `static/` directory.
+/// * `None` if no matching file exists.
+fn resolve_static_path(path: &str) -> Option<String> {
+    let static_dir = PathBuf::from("static");
+
+    let candidates = if path.is_empty() {
+        vec![static_dir.join("index.html")]
+    } else if path.ends_with('/') {
+        vec![static_dir.join(path).join("index.html")]
+    } else if Path::new(path).extension().is_none() {
+        vec![
+            static_dir.join(format!("{path}.html")),
+            static_dir.join(path).join("index.html"),
+        ]
+    } else {
+        vec![static_dir.join(path)]
+    };
+
+    for candidate in candidates {
+        if candidate.exists() && candidate.is_file() {
+            return Some(candidate.to_string_lossy().to_string());
         }
     }
 
