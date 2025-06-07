@@ -176,7 +176,7 @@ fn guess_mime_type(path: &str) -> &'static str {
 ///
 /// * `socket` - The UnixStream to send the response through.
 /// * `response_parts` - A tuple containing the status line (String),
-///   headers (String), and body (Vec<u8>).
+///   headers (String), and body (`Vec<u8>`).
 pub async fn send_response(
     mut socket: UnixStream,
     response_parts: (String, String, Vec<u8>),
