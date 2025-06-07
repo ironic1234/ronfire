@@ -1,4 +1,4 @@
-use mime_guess::from_path;
+use std::path::Path;
 use std::fs;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{UnixListener, UnixStream};
@@ -90,10 +90,7 @@ pub fn parse_request(request: &str) -> Option<String> {
 pub fn generate_response(full_path: &str) -> (String, String, Vec<u8>) {
     match fs::read(full_path) {
         Ok(contents) => {
-            let mime_type = from_path(full_path)
-                .first_or_octet_stream()
-                .essence_str()
-                .to_string();
+            let mime_type = guess_mime_type(full_path);
 
             let status_line = "HTTP/1.1 200 OK\r\n".to_string();
             let headers = format!(
@@ -114,6 +111,58 @@ pub fn generate_response(full_path: &str) -> (String, String, Vec<u8>) {
 
             (status_line, headers, body)
         }
+    }
+}
+
+/// Guesses the MIME type of a file based on its extension.
+///
+/// This function inspects the file extension of the provided path string and returns
+/// a corresponding MIME type string. It handles a variety of common web and media formats.
+///
+/// # Arguments
+///
+/// * `path` - A string slice representing the file path. Only the file extension is used.
+///
+/// # Returns
+///
+/// A string slice representing the MIME type. If the extension is not recognized,
+/// `"application/octet-stream"` is returned as a default fallback.
+///
+/// # Examples
+///
+/// ```
+/// let mime = guess_mime_type("index.html");
+/// assert_eq!(mime, "text/html");
+///
+/// let mime = guess_mime_type("image.jpeg");
+/// assert_eq!(mime, "image/jpeg");
+///
+/// let mime = guess_mime_type("unknownfile.xyz");
+/// assert_eq!(mime, "application/octet-stream");
+/// ```
+fn guess_mime_type(path: &str) -> &'static str {
+    match Path::new(path).extension().and_then(|s| s.to_str()) {
+        Some("html") => "text/html",
+        Some("htm") => "text/html",
+        Some("css") => "text/css",
+        Some("js") => "application/javascript",
+        Some("json") => "application/json",
+        Some("png") => "image/png",
+        Some("jpg") | Some("jpeg") => "image/jpeg",
+        Some("gif") => "image/gif",
+        Some("svg") => "image/svg+xml",
+        Some("ico") => "image/x-icon",
+        Some("txt") => "text/plain",
+        Some("wasm") => "application/wasm",
+        Some("woff") => "font/woff",
+        Some("woff2") => "font/woff2",
+        Some("ttf") => "font/ttf",
+        Some("otf") => "font/otf",
+        Some("mp4") => "video/mp4",
+        Some("webm") => "video/webm",
+        Some("ogg") => "audio/ogg",
+        Some("mp3") => "audio/mpeg",
+        _ => "application/octet-stream", // default fallback
     }
 }
 
@@ -162,3 +211,5 @@ pub async fn read_socket(
     let n = socket.read(&mut buf).await?;
     Ok((String::from_utf8_lossy(&buf[..n]).to_string(), socket))
 }
+
+
