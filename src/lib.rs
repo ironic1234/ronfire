@@ -218,7 +218,7 @@ fn guess_mime_type(path: &str) -> &'static str {
 /// * `response_parts` - A tuple containing the status line (String),
 ///   headers (String), and body (`Vec<u8>`).
 pub async fn send_response(
-    mut socket: UnixStream,
+    socket: &mut UnixStream,
     response_parts: (String, String, Vec<u8>),
 ) {
     let (status, headers, body) = response_parts;
@@ -245,11 +245,11 @@ pub async fn send_response(
 /// # Errors
 /// Returns an error if reading from the socket fails.
 pub async fn read_socket(
-    mut socket: UnixStream,
-) -> Result<(String, UnixStream), std::io::Error> {
+    socket: &mut UnixStream,
+) -> Result<String, std::io::Error> {
     let mut buf = [0; 1024];
     let n = socket.read(&mut buf).await?;
-    Ok((String::from_utf8_lossy(&buf[..n]).to_string(), socket))
+    Ok(String::from_utf8_lossy(&buf[..n]).to_string())
 }
 
 
