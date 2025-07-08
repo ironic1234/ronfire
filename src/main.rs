@@ -1,5 +1,6 @@
 use ronfire::{
-    create_socket, generate_response, parse_request, read_socket, send_response,
+    AsyncLogger, create_socket, generate_response, parse_request, read_socket,
+    send_response,
 };
 use std::env;
 
@@ -9,10 +10,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .nth(1)
         .unwrap_or_else(|| "/tmp/ronfire.sock".to_string());
 
+    let logger = AsyncLogger::new();
     let listener = create_socket(socket_path).expect("Could not create socket");
 
     loop {
         let (mut socket, _) = listener.accept().await?;
+        let logger = logger.clone();
 
         tokio::spawn(async move {
             loop {
@@ -24,7 +27,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             || (request.contains("HTTP/1.1")
                                 && !request.contains("Connection: close"));
 
-                        if let Some(full_path) = parse_request(&request) {
+                        if let Some(full_path) = parse_request(&request, Some(&logger)).await {
                             let mut response = generate_response(&full_path);
 
                             // Append appropriate Connection header
@@ -38,9 +41,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             response.1 =
                                 format!("{}{}", connection_header, response.1);
 
-                            send_response(&mut socket, response).await;
+                            send_response(&mut socket, response, Some(&logger)).await;
                         } else {
-                            eprintln!("Invalid request: {}", request);
+                            logger.log(&format!("Invalid request: {}", request)).await;
                             break;
                         }
 
@@ -49,7 +52,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         }
                     }
                     Err(e) => {
-                        eprintln!("Failed to read from socket: {:?}", e);
+                        logger.log(&format!("Failed to read from socket: {:?}", e)).await;
                         break;
                     }
                 }

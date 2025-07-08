@@ -1,7 +1,45 @@
-use std::path::{Path, PathBuf};
 use std::fs;
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
+use std::time::{SystemTime, UNIX_EPOCH};
+use tokio::fs::OpenOptions;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{UnixListener, UnixStream};
+use tokio::sync::Mutex;
+
+#[derive(Clone)]
+pub struct AsyncLogger {
+    file_mutex: Arc<Mutex<()>>,
+}
+
+impl AsyncLogger {
+    pub fn new() -> Self {
+        Self {
+            file_mutex: Arc::new(Mutex::new(())),
+        }
+    }
+
+    pub async fn log(&self, message: &str) {
+        let _lock = self.file_mutex.lock().await;
+        let now = SystemTime::now();
+        let timestamp = match now.duration_since(UNIX_EPOCH) {
+            Ok(duration) => duration.as_secs(),
+            Err(_) => 0, // Fallback to 0 if the time is before the Unix epoch
+        };
+        let log_message = format!("[{}] {}\n", timestamp, message);
+
+        let mut file = OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open("app.log")
+            .await
+            .expect("Unable to open log file");
+
+        file.write_all(log_message.as_bytes())
+            .await
+            .expect("Unable to write to log file");
+    }
+}
 
 /// Creates a Unix domain socket at the given path.
 ///
@@ -33,11 +71,15 @@ pub fn create_socket(socket_path: String) -> std::io::Result<UnixListener> {
 /// # Arguments
 ///
 /// * `request` - A string slice representing the raw HTTP request.
+/// * `logger` - An optional reference to an `AsyncLogger` for logging errors and warnings.
 ///
 /// # Returns
 ///
 /// Returns `Some(String)` with the resolved file path if the request is valid and supported, or `None` otherwise.
-pub fn parse_request(request: &str) -> Option<String> {
+pub async fn parse_request(
+    request: &str,
+    logger: Option<&AsyncLogger>,
+) -> Option<String> {
     let mut lines = request.lines();
     if let Some(first_line) = lines.next() {
         let mut parts = first_line.split_whitespace();
@@ -46,7 +88,11 @@ pub fn parse_request(request: &str) -> Option<String> {
         let version = parts.next().unwrap_or("");
 
         if version != "HTTP/1.1" && version != "HTTP/1.0" {
-            eprintln!("Unsupported HTTP version: {}", version);
+            if let Some(logger) = logger {
+                logger.log(&format!("Unsupported HTTP version: {}", version)).await;
+            } else {
+                eprintln!("Unsupported HTTP version: {}", version);
+            } 
             return None;
         }
 
@@ -55,13 +101,21 @@ pub fn parse_request(request: &str) -> Option<String> {
 
             // Reject paths that try to traverse outside the static directory
             if path.split('/').any(|part| part == "..") {
-                eprintln!("Path traversal attempt: {}", path);
+                if let Some(logger) = logger {
+                    logger.log(&format!("Attempted path traversal method: {}", path)).await;
+                } else {
+                    eprintln!("Attempted path traversal method: {}", path);
+                }
                 return None;
             }
 
             return resolve_static_path(path);
         } else {
-            eprintln!("Unsupported HTTP method: {}", method);
+            if let Some(logger) = logger {
+                logger.log(&format!("Unsupported HTTP Method: {}", method)).await;
+            } else {
+                eprintln!("Unsupported HTTP Method: {}", method);
+            }
             return None;
         }
     }
@@ -220,21 +274,34 @@ fn guess_mime_type(path: &str) -> &'static str {
 pub async fn send_response(
     socket: &mut UnixStream,
     response_parts: (String, String, Vec<u8>),
+    logger: Option<&AsyncLogger>,
 ) {
     let (status, headers, body) = response_parts;
 
     if let Err(e) = socket.write_all(status.as_bytes()).await {
-        eprintln!("Failed to write status line: {}", e);
+        if let Some(logger) = logger {
+            logger.log(&format!("Failed to write status line: {}", e)).await;
+        } else {
+            eprintln!("Failed to write status line: {}", e);
+        }
         return;
     }
 
     if let Err(e) = socket.write_all(headers.as_bytes()).await {
-        eprintln!("Failed to write headers: {}", e);
+        if let Some(logger) = logger {
+            logger.log(&format!("Failed to write headers: {}", e)).await;
+        } else {
+            eprintln!("Failed to write headers: {}", e);
+        }
         return;
     }
 
     if let Err(e) = socket.write_all(&body).await {
-        eprintln!("Failed to write body: {}", e);
+        if let Some(logger) = logger {
+            logger.log(&format!("Failed to write body: {}", e)).await;
+        } else {
+            eprintln!("Failed to write body: {}", e);
+        }
     }
 }
 
@@ -251,5 +318,3 @@ pub async fn read_socket(
     let n = socket.read(&mut buf).await?;
     Ok(String::from_utf8_lossy(&buf[..n]).to_string())
 }
-
-
