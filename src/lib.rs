@@ -65,8 +65,7 @@ pub fn create_socket(socket_path: String) -> std::io::Result<UnixListener> {
 // Parses a raw HTTP request string and extracts the target file path.
 ///
 /// This function supports only `GET` requests with HTTP/1.0 or HTTP/1.1. It trims the leading `/`
-/// from the path and prepends `"static/"` to resolve the file path. If the path is empty, it defaults
-/// to `"static/index.html"`.
+/// and resolves the file path. If the path is empty, it defaults to `"index.html"`
 ///
 /// # Arguments
 ///
@@ -76,6 +75,7 @@ pub fn create_socket(socket_path: String) -> std::io::Result<UnixListener> {
 /// # Returns
 ///
 /// Returns `Some(String)` with the resolved file path if the request is valid and supported, or `None` otherwise.
+
 pub async fn parse_request(
     request: &str,
     logger: Option<&AsyncLogger>,
@@ -92,14 +92,13 @@ pub async fn parse_request(
                 logger.log(&format!("Unsupported HTTP version: {}", version)).await;
             } else {
                 eprintln!("Unsupported HTTP version: {}", version);
-            } 
+            }
             return None;
         }
 
         if method == "GET" {
             let path = path.trim_start_matches('/');
 
-            // Reject paths that try to traverse outside the static directory
             if path.split('/').any(|part| part == "..") {
                 if let Some(logger) = logger {
                     logger.log(&format!("Attempted path traversal method: {}", path)).await;
@@ -109,7 +108,7 @@ pub async fn parse_request(
                 return None;
             }
 
-            return resolve_static_path(path);
+            return resolve_path(path);
         } else {
             if let Some(logger) = logger {
                 logger.log(&format!("Unsupported HTTP Method: {}", method)).await;
@@ -123,15 +122,16 @@ pub async fn parse_request(
     None
 }
 
+
 /// Resolves a user-facing URL path to a static file path on disk using fallback rules.
 ///
 /// This function applies simple fallback logic for friendly URLs:
 ///
-/// - An empty path (e.g., `/`) maps to `static/index.html`.
-/// - A path ending with `/` (e.g., `/blog/`) maps to `static/blog/index.html`.
+/// - An empty path (e.g., `/`) maps to `./index.html`.
+/// - A path ending with `/` (e.g., `/blog/`) maps to `./blog/index.html`.
 /// - A path without an extension (e.g., `/about`) tries:
-///     - `static/about.html`
-///     - `static/about/index.html`
+///     - `./about.html`
+///     - `./about/index.html`
 /// - A path with an extension (e.g., `/style.css`) is used as-is.
 ///
 /// The first path that exists and is a regular file is returned.
@@ -144,20 +144,20 @@ pub async fn parse_request(
 ///
 /// * `Some(String)` if a valid file is found under the `static/` directory.
 /// * `None` if no matching file exists.
-fn resolve_static_path(path: &str) -> Option<String> {
-    let static_dir = PathBuf::from("static");
+fn resolve_path(path: &str) -> Option<String> {
+    let base = PathBuf::from(".");
 
     let candidates = if path.is_empty() {
-        vec![static_dir.join("index.html")]
+        vec![base.join("index.html")]
     } else if path.ends_with('/') {
-        vec![static_dir.join(path).join("index.html")]
+        vec![base.join(path).join("index.html")]
     } else if Path::new(path).extension().is_none() {
         vec![
-            static_dir.join(format!("{path}.html")),
-            static_dir.join(path).join("index.html"),
+            base.join(format!("{path}.html")),
+            base.join(path).join("index.html"),
         ]
     } else {
-        vec![static_dir.join(path)]
+        vec![base.join(path)]
     };
 
     for candidate in candidates {
@@ -168,7 +168,6 @@ fn resolve_static_path(path: &str) -> Option<String> {
 
     None
 }
-
 /// Generates a complete HTTP response based on the contents of a file.
 ///
 /// If the file exists and can be read, it returns a `200 OK` response with the file contents.
