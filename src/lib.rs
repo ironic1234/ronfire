@@ -242,6 +242,7 @@ fn guess_mime_type(path: &str) -> &'static str {
         Some("json") => "application/json",
         Some("png") => "image/png",
         Some("jpg") | Some("jpeg") => "image/jpeg",
+        Some("webp") => "image/webp",
         Some("gif") => "image/gif",
         Some("svg") => "image/svg+xml",
         Some("ico") => "image/x-icon",
