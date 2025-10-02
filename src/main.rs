@@ -27,7 +27,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             || (request.contains("HTTP/1.1")
                                 && !request.contains("Connection: close"));
 
-                        if let Some(full_path) = parse_request(&request, Some(&logger)).await {
+                        if let Some(full_path) =
+                            parse_request(&request, Some(&logger)).await
+                        {
                             let mut response = generate_response(&full_path);
 
                             // Append appropriate Connection header
@@ -41,9 +43,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             response.1 =
                                 format!("{}{}", connection_header, response.1);
 
-                            send_response(&mut socket, response, Some(&logger)).await;
+                            send_response(&mut socket, response, Some(&logger))
+                                .await;
                         } else {
-                            logger.log(&format!("Invalid request: {}", request)).await;
+                            logger
+                                .log(&format!("Invalid request: {}", request))
+                                .await;
                             break;
                         }
 
@@ -52,7 +57,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         }
                     }
                     Err(e) => {
-                        logger.log(&format!("Failed to read from socket: {:?}", e)).await;
+                        logger
+                            .log(&format!(
+                                "Failed to read from socket: {:?}",
+                                e
+                            ))
+                            .await;
                         break;
                     }
                 }

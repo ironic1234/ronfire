@@ -89,7 +89,9 @@ pub async fn parse_request(
 
         if version != "HTTP/1.1" && version != "HTTP/1.0" {
             if let Some(logger) = logger {
-                logger.log(&format!("Unsupported HTTP version: {}", version)).await;
+                logger
+                    .log(&format!("Unsupported HTTP version: {}", version))
+                    .await;
             } else {
                 eprintln!("Unsupported HTTP version: {}", version);
             }
@@ -101,7 +103,12 @@ pub async fn parse_request(
 
             if path.split('/').any(|part| part == "..") {
                 if let Some(logger) = logger {
-                    logger.log(&format!("Attempted path traversal method: {}", path)).await;
+                    logger
+                        .log(&format!(
+                            "Attempted path traversal method: {}",
+                            path
+                        ))
+                        .await;
                 } else {
                     eprintln!("Attempted path traversal method: {}", path);
                 }
@@ -111,7 +118,9 @@ pub async fn parse_request(
             return resolve_path(path);
         } else {
             if let Some(logger) = logger {
-                logger.log(&format!("Unsupported HTTP Method: {}", method)).await;
+                logger
+                    .log(&format!("Unsupported HTTP Method: {}", method))
+                    .await;
             } else {
                 eprintln!("Unsupported HTTP Method: {}", method);
             }
@@ -121,7 +130,6 @@ pub async fn parse_request(
 
     None
 }
-
 
 /// Resolves a user-facing URL path to a static file path on disk using fallback rules.
 ///
@@ -142,7 +150,7 @@ pub async fn parse_request(
 ///
 /// # Returns
 ///
-/// * `Some(String)` if a valid file is found under the `static/` directory.
+/// * `Some(String)` if a valid file is found.
 /// * `None` if no matching file exists.
 fn resolve_path(path: &str) -> Option<String> {
     let base = PathBuf::from(".");
@@ -280,7 +288,9 @@ pub async fn send_response(
 
     if let Err(e) = socket.write_all(status.as_bytes()).await {
         if let Some(logger) = logger {
-            logger.log(&format!("Failed to write status line: {}", e)).await;
+            logger
+                .log(&format!("Failed to write status line: {}", e))
+                .await;
         } else {
             eprintln!("Failed to write status line: {}", e);
         }
